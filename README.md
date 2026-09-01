@@ -36,9 +36,11 @@ account, no token, nothing to configure.
 This instance is already live:
 
 - **Repo:** <https://github.com/JimBobSnow/Orderblock>
-- **Site:** <https://jimbobsnow.github.io/Orderblock/> (deploys automatically
-  on every push to `main` via [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) —
-  check the repo's **Actions** tab for build status)
+- **Site:** <https://jimbobsnow.com/> (custom domain — the repo's Pages URL
+  `https://jimbobsnow.github.io/Orderblock/` also works). Deploys
+  automatically on every push to `main` via
+  [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) —
+  check the repo's **Actions** tab for build status.
 - **Worker:** `https://bo-tracker-uploader.markwave01.workers.dev`, already
   set in [`js/config.js`](js/config.js)
 
