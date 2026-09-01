@@ -22,16 +22,8 @@ function renderNav() {
   document.body.prepend(header);
 }
 
-function renderFooter() {
-  const footer = document.createElement('footer');
-  footer.className = 'site-footer';
-  footer.innerHTML = `<p>Data for this tracker lives directly in this GitHub repository — no external database. <a href="README.md" target="_blank" rel="noopener">How it works →</a></p>`;
-  document.body.appendChild(footer);
-}
-
 export function initShell() {
   renderNav();
-  renderFooter();
 }
 
 document.addEventListener('DOMContentLoaded', initShell);
