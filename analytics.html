@@ -16,10 +16,6 @@
 
     <section class="card controls-card">
       <div class="controls-row">
-        <div class="segmented" id="view-toggle">
-          <button type="button" data-view="overall" class="active">Overall</button>
-          <button type="button" data-view="uploader">By Uploader</button>
-        </div>
         <div class="segmented" id="source-toggle">
           <button type="button" data-source="both" class="active">Trading + Backtesting</button>
           <button type="button" data-source="trading">Trading only</button>
@@ -30,15 +26,36 @@
 
     <section class="card stats-summary" id="summary-cards"></section>
 
-    <section class="card">
-      <h2>Winrate by tag</h2>
-      <canvas id="chart-tags" height="280"></canvas>
+    <section class="card perf-card">
+      <div class="perf-header"><span class="perf-icon">🎯</span><h2>Tag Performance</h2></div>
+      <div class="perf-body">
+        <div class="perf-chart-wrap"><canvas id="chart-tags"></canvas></div>
+        <div class="perf-best tag-flavor" id="best-tag-card"></div>
+      </div>
+      <div class="perf-table-wrap"><table class="data-table" id="tag-table"></table></div>
     </section>
 
-    <section class="card hidden" id="uploader-section">
-      <h2>By uploader</h2>
-      <canvas id="chart-uploaders" height="280"></canvas>
-      <div id="uploader-table"></div>
+    <section class="card perf-card">
+      <div class="perf-header"><span class="perf-icon">👤</span><h2>Uploader Performance</h2></div>
+      <div class="perf-body">
+        <div class="perf-chart-wrap"><canvas id="chart-uploaders"></canvas></div>
+        <div class="perf-best uploader-flavor" id="best-uploader-card"></div>
+      </div>
+      <div class="perf-table-wrap"><table class="data-table" id="uploader-table"></table></div>
+    </section>
+
+    <section class="card">
+      <h2>Overview</h2>
+      <div class="pie-row">
+        <div class="pie-block">
+          <h3>Win / loss split</h3>
+          <div class="pie-canvas-wrap"><canvas id="chart-winloss-pie"></canvas></div>
+        </div>
+        <div class="pie-block">
+          <h3>Trade share by uploader</h3>
+          <div class="pie-canvas-wrap"><canvas id="chart-uploader-pie"></canvas></div>
+        </div>
+      </div>
     </section>
   </main>
 

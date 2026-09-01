@@ -19,7 +19,7 @@ function isAllowedPath(path) {
 function corsHeaders(env) {
   return {
     'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
-    'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type'
   };
 }
@@ -92,6 +92,33 @@ async function handlePut(request, env) {
   return json(env, { sha: data.content && data.content.sha });
 }
 
+async function handleDelete(request, env) {
+  let body;
+  try { body = await request.json(); } catch (e) { return json(env, { error: 'Invalid JSON body.' }, 400); }
+
+  const { path, sha, message } = body || {};
+  if (typeof path !== 'string' || !isAllowedPath(path)) return json(env, { error: 'Path not allowed.' }, 400);
+  if (typeof sha !== 'string' || !sha) return json(env, { error: 'Missing sha.' }, 400);
+
+  const res = await fetch(contentsUrl(env, path), {
+    method: 'DELETE',
+    headers: { ...githubHeaders(env), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: typeof message === 'string' && message ? message.slice(0, 300) : `Delete ${path}`,
+      sha,
+      branch: env.GITHUB_BRANCH || 'main'
+    })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    let detail = text;
+    try { detail = JSON.parse(text).message || text; } catch (e) { /* ignore */ }
+    return json(env, { error: detail }, res.status);
+  }
+  return json(env, { ok: true });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -104,6 +131,7 @@ export default {
     }
     if (request.method === 'GET') return handleGet(url, env);
     if (request.method === 'PUT') return handlePut(request, env);
+    if (request.method === 'DELETE') return handleDelete(request, env);
     return json(env, { error: 'Method not allowed.' }, 405);
   }
 };

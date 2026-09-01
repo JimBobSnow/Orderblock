@@ -6,7 +6,7 @@
 // winrate and trade count are never entered manually — they're always
 // computed from its trades.
 
-import { getLastName, setLastName, getJson, updateJsonFile, uploadImageFile, uuid, toast, rawUrl } from './store.js';
+import { getLastName, setLastName, getJson, updateJsonFile, uploadImageFile, deleteFile, uuid, toast, rawUrl } from './store.js';
 
 const PRESET_TAGS = ['BOS', 'CHOCH', 'Support/Resistance', 'Swing', 'With trend', 'Against trend'];
 
@@ -212,8 +212,8 @@ function openSessionBuilder(ctx) {
     try {
       const tradeId = uuid();
       const path = `${ctx.imageDir}/${session.id}-${tradeId}.jpg`;
-      await uploadImageFile(pending.file, path, `${ctx.commitPrefix}: trade photo for ${session.uploader || 'session'}`);
-      session.trades.push({ id: tradeId, result: pending.result, tags: Array.from(pending.tags), image: path, previewUrl: rawUrl(path) });
+      const uploadRes = await uploadImageFile(pending.file, path, `${ctx.commitPrefix}: trade photo for ${session.uploader || 'session'}`);
+      session.trades.push({ id: tradeId, result: pending.result, tags: Array.from(pending.tags), image: path, imageSha: uploadRes.sha, previewUrl: rawUrl(path) });
       pending = { file: null, result: null, tags: new Set() };
       mode = 'idle';
       renderBody();
@@ -235,7 +235,7 @@ function openSessionBuilder(ctx) {
         id: session.id,
         uploader: session.uploader.trim() || 'Anonymous',
         date: session.date || new Date().toISOString().slice(0, 10),
-        trades: session.trades.map(({ id, result, tags, image }) => ({ id, result, tags, image })),
+        trades: session.trades.map(({ id, result, tags, image, imageSha }) => ({ id, result, tags, image, imageSha })),
         comments: [],
         createdAt: new Date().toISOString()
       };
@@ -315,6 +315,42 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
     lb.classList.remove('hidden');
   }
 
+  async function deleteSession(entry) {
+    const ok = window.confirm(`Delete this ${entryNoun} session by ${entry.uploader || 'Anonymous'}? This can't be undone.`);
+    if (!ok) return;
+    try {
+      const updated = await updateJsonFile(dataPath, (data) => data.filter((x) => x.id !== entry.id), `${commitPrefix}: delete session by ${entry.uploader || 'Anonymous'}`);
+      state.entries = updated;
+      renderList();
+      renderFilterBar();
+      toast('Session deleted.', 'success');
+      (entry.trades || []).forEach((t) => {
+        if (t.imageSha) deleteFile(t.image, t.imageSha, `${commitPrefix}: cleanup photo after session delete`).catch(() => {});
+      });
+    } catch (err) {
+      toast(err.message || 'Could not delete session.', 'error');
+    }
+  }
+
+  async function deleteTrade(entry, trade) {
+    const ok = window.confirm('Delete this trade from the session?');
+    if (!ok) return;
+    try {
+      const updated = await updateJsonFile(dataPath, (data) => {
+        const target = data.find((x) => x.id === entry.id);
+        if (target) target.trades = (target.trades || []).filter((t) => t.id !== trade.id);
+        return data;
+      }, `${commitPrefix}: delete trade from session by ${entry.uploader || 'Anonymous'}`);
+      state.entries = updated;
+      renderList();
+      renderFilterBar();
+      toast('Trade deleted.', 'success');
+      if (trade.imageSha) deleteFile(trade.image, trade.imageSha, `${commitPrefix}: cleanup photo after trade delete`).catch(() => {});
+    } catch (err) {
+      toast(err.message || 'Could not delete trade.', 'error');
+    }
+  }
+
   function renderCard(entry) {
     const stats = computeStats(entry.trades);
     const card = document.createElement('article');
@@ -330,14 +366,16 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
         <div class="entry-stats">
           <span class="stat winrate ${winClass}">${stats.winrate.toFixed(1)}% winrate</span>
           <span class="stat">${stats.numTrades} trade${stats.numTrades === 1 ? '' : 's'}</span>
+          <button type="button" class="btn-icon delete-session-btn" title="Delete session" aria-label="Delete session">🗑</button>
         </div>
       </div>
       <div class="trade-grid">
         ${(entry.trades || []).map((t) => `
-          <div class="trade-chip">
+          <div class="trade-chip" data-trade-id="${escapeHtml(t.id)}">
             <div class="trade-thumb-wrap">
               <img class="trade-thumb" src="${rawUrl(t.image)}" data-full="${rawUrl(t.image)}" loading="lazy" alt="${t.result === 'win' ? 'Winning' : 'Losing'} trade screenshot" />
               <span class="result-badge ${t.result}">${t.result === 'win' ? 'W' : 'L'}</span>
+              <button type="button" class="trade-delete-btn" title="Delete trade" aria-label="Delete trade">✕</button>
             </div>
             <div class="trade-chip-tags">${(t.tags || []).map((tag) => `<span class="tag-chip static mini">${escapeHtml(tag)}</span>`).join('')}</div>
           </div>
@@ -363,6 +401,17 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
 
     card.querySelectorAll('.trade-thumb').forEach((img) => {
       img.addEventListener('click', () => openLightbox(img.dataset.full));
+    });
+
+    card.querySelector('.delete-session-btn').addEventListener('click', () => deleteSession(entry));
+
+    card.querySelectorAll('.trade-delete-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tradeId = btn.closest('.trade-chip').dataset.tradeId;
+        const trade = (entry.trades || []).find((t) => t.id === tradeId);
+        if (trade) deleteTrade(entry, trade);
+      });
     });
 
     card.querySelector('.comment-form').addEventListener('submit', async (e) => {

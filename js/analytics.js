@@ -1,19 +1,34 @@
-// Analytics page: aggregates trading + backtesting sessions by tag and by
-// uploader, with a source filter (trading / backtesting / both). Works on
-// individual trades (each with its own result + tags), not on sessions,
-// since tags and win/loss now live at the trade level.
+// Analytics page: performance breakdowns by tag and by uploader (bar chart +
+// "best performer" card + table, each), plus a win/loss and uploader-share
+// pie overview. Works on individual trades (each with its own result +
+// tags), not on sessions, since tags and win/loss live at the trade level.
 
 import { getJson, toast } from './store.js';
 
 let trades = [];
 let backtests = [];
-let view = 'overall';
 let source = 'both';
 let chartTags = null;
 let chartUploaders = null;
+let chartWinLoss = null;
+let chartUploaderPie = null;
+
+const PIE_PALETTE = ['#4da6ff', '#a855f7', '#2ecc71', '#f1c40f', '#e74c3c', '#38bdf8', '#f472b6', '#fb923c'];
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function isLightMode() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+}
+
+function axisColor() {
+  return isLightMode() ? '#5a6785' : '#9aa7c2';
+}
+
+function gridColor() {
+  return isLightMode() ? 'rgba(20,30,60,0.08)' : 'rgba(255,255,255,0.06)';
 }
 
 function combinedSessions() {
@@ -29,7 +44,7 @@ function combinedTrades(sessions) {
 function statsFor(tradeList) {
   const numTrades = tradeList.length;
   const wins = tradeList.filter((t) => t.result === 'win').length;
-  return { totalTrades: numTrades, winrate: numTrades > 0 ? (wins / numTrades) * 100 : 0 };
+  return { totalTrades: numTrades, wins, winrate: numTrades > 0 ? (wins / numTrades) * 100 : 0 };
 }
 
 function byTag(tradeList) {
@@ -59,12 +74,6 @@ function byUploader(sessions) {
     .sort((a, b) => b.winrate - a.winrate);
 }
 
-function colorFor(rate) {
-  if (rate >= 60) return '#2ecc71';
-  if (rate >= 45) return '#f1c40f';
-  return '#e74c3c';
-}
-
 function renderSummary(sessions, allTrades) {
   const s = statsFor(allTrades);
   document.getElementById('summary-cards').innerHTML = `
@@ -74,71 +83,118 @@ function renderSummary(sessions, allTrades) {
   `;
 }
 
-function renderTagChart(allTrades) {
-  const rows = byTag(allTrades);
-  const ctx = document.getElementById('chart-tags');
-  if (chartTags) chartTags.destroy();
-  if (rows.length === 0) { ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height); return; }
+// Shared renderer for the Tag Performance / Uploader Performance cards:
+// a horizontal bar chart, a "best performer" highlight, and a data table.
+function renderPerfSection({ rows, canvasEl, existingChart, color, bestEl, bestIcon, bestLabel, tableEl, labelKey, nameLabel, extraCol }) {
+  if (existingChart) existingChart.destroy();
+  let chart = null;
 
-  chartTags = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: rows.map((r) => r.tag),
-      datasets: [{ label: 'Winrate %', data: rows.map((r) => r.winrate), backgroundColor: rows.map((r) => colorFor(r.winrate)) }]
-    },
-    options: {
-      scales: { y: { beginAtZero: true, max: 100 } },
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { afterLabel: (c) => `${rows[c.dataIndex].totalTrades} trades tagged` } }
+  if (rows.length > 0) {
+    chart = new Chart(canvasEl, {
+      type: 'bar',
+      data: {
+        labels: rows.map((r) => r[labelKey]),
+        datasets: [{ data: rows.map((r) => r.winrate), backgroundColor: color, borderRadius: 4, maxBarThickness: 28 }]
+      },
+      options: {
+        indexAxis: 'y',
+        maintainAspectRatio: false,
+        scales: {
+          x: { beginAtZero: true, max: 100, ticks: { color: axisColor(), callback: (v) => `${v}%` }, grid: { color: gridColor() } },
+          y: { ticks: { color: axisColor() }, grid: { display: false } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => `${c.parsed.x.toFixed(1)}% winrate` } }
+        }
       }
-    }
+    });
+  } else {
+    canvasEl.getContext('2d').clearRect(0, 0, canvasEl.width, canvasEl.height);
+  }
+
+  const best = rows.slice().sort((a, b) => b.winrate - a.winrate || b.totalTrades - a.totalTrades)[0];
+  bestEl.innerHTML = best ? `
+    <span class="perf-best-icon">${bestIcon}</span>
+    <div class="perf-best-label">${bestLabel}</div>
+    <div class="perf-best-name">${escapeHtml(best[labelKey])}</div>
+    <div class="perf-best-sub">${best.winrate.toFixed(1)}% win rate · ${best.totalTrades} trade${best.totalTrades === 1 ? '' : 's'}</div>
+  ` : '<p class="hint">No data yet.</p>';
+
+  const colCount = extraCol ? 5 : 4;
+  tableEl.innerHTML = `
+    <thead><tr><th>${nameLabel}</th>${extraCol ? `<th>${extraCol.label}</th>` : ''}<th>Trades</th><th>Wins</th><th>Win Rate</th></tr></thead>
+    <tbody>
+      ${rows.map((r) => `<tr><td>${escapeHtml(r[labelKey])}</td>${extraCol ? `<td>${r[extraCol.key]}</td>` : ''}<td>${r.totalTrades}</td><td>${r.wins}</td><td>${r.winrate.toFixed(1)}%</td></tr>`).join('') || `<tr><td colspan="${colCount}" class="hint">No entries yet.</td></tr>`}
+    </tbody>
+  `;
+
+  return chart;
+}
+
+function renderWinLossPie(allTrades) {
+  const wins = allTrades.filter((t) => t.result === 'win').length;
+  const losses = allTrades.length - wins;
+  if (chartWinLoss) chartWinLoss.destroy();
+  const canvas = document.getElementById('chart-winloss-pie');
+  if (allTrades.length === 0) { canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); return; }
+  chartWinLoss = new Chart(canvas, {
+    type: 'pie',
+    data: { labels: ['Wins', 'Losses'], datasets: [{ data: [wins, losses], backgroundColor: ['#2ecc71', '#e74c3c'] }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: axisColor() } } } }
   });
 }
 
-function renderUploaderView(sessions) {
+function renderUploaderPie(sessions) {
   const rows = byUploader(sessions);
-  const ctx = document.getElementById('chart-uploaders');
-  if (chartUploaders) chartUploaders.destroy();
-
-  if (rows.length > 0) {
-    chartUploaders = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: rows.map((r) => r.name),
-        datasets: [{ label: 'Winrate %', data: rows.map((r) => r.winrate), backgroundColor: rows.map((r) => colorFor(r.winrate)) }]
-      },
-      options: { scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
-    });
-  }
-
-  document.getElementById('uploader-table').innerHTML = `
-    <table class="data-table">
-      <thead><tr><th>Uploader</th><th>Sessions</th><th>Trades</th><th>Winrate</th></tr></thead>
-      <tbody>
-        ${rows.map((r) => `<tr><td>${escapeHtml(r.name)}</td><td>${r.sessions}</td><td>${r.totalTrades}</td><td>${r.winrate.toFixed(1)}%</td></tr>`).join('') || '<tr><td colspan="4" class="hint">No entries yet.</td></tr>'}
-      </tbody>
-    </table>
-  `;
+  if (chartUploaderPie) chartUploaderPie.destroy();
+  const canvas = document.getElementById('chart-uploader-pie');
+  if (rows.length === 0) { canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); return; }
+  chartUploaderPie = new Chart(canvas, {
+    type: 'pie',
+    data: {
+      labels: rows.map((r) => r.name),
+      datasets: [{ data: rows.map((r) => r.totalTrades), backgroundColor: rows.map((_, i) => PIE_PALETTE[i % PIE_PALETTE.length]) }]
+    },
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: axisColor() } } } }
+  });
 }
 
 function render() {
   const sessions = combinedSessions();
   const allTrades = combinedTrades(sessions);
   renderSummary(sessions, allTrades);
-  renderTagChart(allTrades);
-  document.getElementById('uploader-section').classList.toggle('hidden', view !== 'uploader');
-  if (view === 'uploader') renderUploaderView(sessions);
-}
 
-document.querySelectorAll('#view-toggle button').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#view-toggle button').forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    view = btn.dataset.view;
-    render();
+  chartTags = renderPerfSection({
+    rows: byTag(allTrades),
+    canvasEl: document.getElementById('chart-tags'),
+    existingChart: chartTags,
+    color: '#2ecc71',
+    bestEl: document.getElementById('best-tag-card'),
+    bestIcon: '📈',
+    bestLabel: 'Best tag',
+    tableEl: document.getElementById('tag-table'),
+    labelKey: 'tag',
+    nameLabel: 'Tag'
   });
-});
+
+  chartUploaders = renderPerfSection({
+    rows: byUploader(sessions),
+    canvasEl: document.getElementById('chart-uploaders'),
+    existingChart: chartUploaders,
+    color: '#a855f7',
+    bestEl: document.getElementById('best-uploader-card'),
+    bestIcon: '🏆',
+    bestLabel: 'Best uploader',
+    tableEl: document.getElementById('uploader-table'),
+    labelKey: 'name',
+    nameLabel: 'Uploader',
+    extraCol: { key: 'sessions', label: 'Sessions' }
+  });
+
+  renderWinLossPie(allTrades);
+  renderUploaderPie(sessions);
+}
 
 document.querySelectorAll('#source-toggle button').forEach((btn) => {
   btn.addEventListener('click', () => {

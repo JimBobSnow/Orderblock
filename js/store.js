@@ -100,6 +100,21 @@ async function putFileRaw(path, base64Content, sha, message) {
   return res.json();
 }
 
+export async function deleteFile(path, sha, message) {
+  let res;
+  try {
+    res = await fetch(`${SITE_CONFIG.workerUrl}/api/file`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, sha, message })
+    });
+  } catch (e) {
+    throw new UploadError(0, 'Could not reach the upload service. Check your connection and try again.');
+  }
+  if (!res.ok) throw await uploadError(res);
+  return res.json();
+}
+
 function utf8ToBase64(str) {
   const bytes = new TextEncoder().encode(str);
   let binary = '';
