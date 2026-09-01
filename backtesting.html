@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Backtesting Results — BO Tracker</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body data-page="backtesting">
+  <main class="container">
+    <section class="page-intro">
+      <h1>Backtesting Results</h1>
+      <p class="hint">Log backtest runs the same way as live trades — one screenshot, win or loss, and tags per trade.</p>
+    </section>
+
+    <section class="list-header-row">
+      <h2>Latest sessions</h2>
+      <button type="button" id="start-session-btn" class="btn btn-primary">+ Upload session</button>
+    </section>
+    <div id="filter-bar" class="tag-row filter-row"></div>
+    <div id="entry-empty" class="empty-state hidden">No backtesting sessions yet — click "Upload session" to add the first one.</div>
+    <div id="entry-list" class="entry-list"></div>
+  </main>
+
+  <script type="module" src="js/shell.js"></script>
+  <script type="module">
+    import { initEntryPage } from './js/entries.js';
+    initEntryPage({
+      dataPath: 'data/backtests.json',
+      imageDir: 'images/backtests',
+      entryNoun: 'backtest',
+      commitPrefix: 'Backtesting'
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+name = "bo-tracker-uploader"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+[vars]
+GITHUB_OWNER = "JimBobSnow"
+GITHUB_REPO = "Orderblock"
+GITHUB_BRANCH = "main"
+ALLOWED_ORIGIN = "https://jimbobsnow.github.io"
+
+# GITHUB_TOKEN is a secret, not a var — never put it in this file.
+# Set it after creating the worker with:
+#   wrangler secret put GITHUB_TOKEN

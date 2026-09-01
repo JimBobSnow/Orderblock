@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Analytics — BO Tracker</title>
+<link rel="stylesheet" href="css/style.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body data-page="analytics">
+  <main class="container">
+    <section class="page-intro">
+      <h1>Analytics</h1>
+      <p class="hint">See how each tag and each trader performs, across trading and backtesting.</p>
+    </section>
+
+    <section class="card controls-card">
+      <div class="controls-row">
+        <div class="segmented" id="view-toggle">
+          <button type="button" data-view="overall" class="active">Overall</button>
+          <button type="button" data-view="uploader">By Uploader</button>
+        </div>
+        <div class="segmented" id="source-toggle">
+          <button type="button" data-source="both" class="active">Trading + Backtesting</button>
+          <button type="button" data-source="trading">Trading only</button>
+          <button type="button" data-source="backtesting">Backtesting only</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card stats-summary" id="summary-cards"></section>
+
+    <section class="card">
+      <h2>Winrate by tag</h2>
+      <canvas id="chart-tags" height="280"></canvas>
+    </section>
+
+    <section class="card hidden" id="uploader-section">
+      <h2>By uploader</h2>
+      <canvas id="chart-uploaders" height="280"></canvas>
+      <div id="uploader-table"></div>
+    </section>
+  </main>
+
+  <script type="module" src="js/shell.js"></script>
+  <script type="module" src="js/analytics.js"></script>
+</body>
+</html>
