@@ -31,51 +31,51 @@ account, no token, nothing to configure.
   hard size cap per file. See the comment at the top of
   [`worker/worker.js`](worker/worker.js) for the full threat model.
 
-## 1. Create the repo and turn on Pages
+## Current deployment
 
-1. Create a new **public** GitHub repository (a free GitHub account can only
-   serve Pages for free from a public repo).
-2. Push everything in this folder to the repo's `main` branch.
-3. In the repo, go to **Settings → Pages**, and under "Build and deployment"
-   choose **Deploy from a branch**, branch `main`, folder `/ (root)`. Save.
-4. After a minute your site is live at:
-   `https://<your-username>.github.io/<repo-name>/`
+This instance is already live:
 
-Reading data works immediately with zero configuration — the site
-auto-detects the owner and repo from that URL. Uploading needs the worker
-below.
+- **Repo:** <https://github.com/JimBobSnow/Orderblock>
+- **Site:** <https://jimbobsnow.github.io/Orderblock/> (deploys automatically
+  on every push to `main` via [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) —
+  check the repo's **Actions** tab for build status)
+- **Worker:** `https://bo-tracker-uploader.markwave01.workers.dev`, already
+  set in [`js/config.js`](js/config.js)
 
-## 2. Deploy the upload proxy (Cloudflare Worker)
+Reading data works with zero further setup. The one remaining step is
+giving the worker a GitHub token so it can actually write — see below.
 
-This is the one part that needs a human with an account — it's a five
-minute job, and only needs doing once.
+## Setting the worker's GitHub token
 
-1. Create a free [Cloudflare account](https://dash.cloudflare.com/sign-up)
-   if you don't have one.
-2. Create a GitHub token the worker will use to write to this repo: go to
-   <https://github.com/settings/personal-access-tokens/new>, set
-   **"Repository access"** to **"Only select repositories"** → this repo,
-   and under **"Permissions"** set **Contents** to **Read and write**
-   (leave everything else as No access). This token is only ever pasted
-   into Cloudflare in step 5 below — it never goes in this repo.
-3. In `worker/wrangler.toml`, fill in `GITHUB_OWNER`, `GITHUB_REPO`, and
-   `ALLOWED_ORIGIN` (your `https://<username>.github.io` origin — no
-   trailing path).
-4. From the `worker/` folder, run:
-   ```bash
-   npx wrangler login
-   npx wrangler deploy
-   ```
-5. Set the GitHub token as a secret (you'll be prompted to paste it):
+The worker needs a token scoped to **only this repo** to commit sessions,
+photos, and notes on visitors' behalf. This is the one step that needs a
+human, and only needs doing once:
+
+1. Go to <https://github.com/settings/personal-access-tokens/new>
+2. **Token name:** anything, e.g. `orderblock-uploader`
+3. **Repository access:** "Only select repositories" → **Orderblock**
+4. **Permissions → Repository permissions:** set **Contents** to
+   **Read and write**. Leave everything else as No access.
+5. Generate the token and copy it.
+6. Set it as the worker's secret — from `worker/`, run:
    ```bash
    npx wrangler secret put GITHUB_TOKEN
    ```
-6. Wrangler prints the worker's URL (something like
-   `https://bo-tracker-uploader.<your-subdomain>.workers.dev`). Paste it
-   into `workerUrl` in [`js/config.js`](js/config.js), commit, and push.
+   and paste the token when prompted (needs `CLOUDFLARE_API_TOKEN` set, or
+   `wrangler login` completed, in that shell).
 
 That's it — from then on, anyone who visits the site can upload sessions
-and leave notes with no setup at all.
+and leave notes with no setup at all. If this token is ever compromised or
+you want to rotate it, revoke it on GitHub and repeat these steps with a
+fresh one — nothing else needs to change.
+
+## Redeploying the worker after code changes
+
+If `worker/worker.js` or `worker/wrangler.toml` changes, redeploy with:
+```bash
+cd worker && npx wrangler deploy
+```
+(The `GITHUB_TOKEN` secret survives redeploys — you only set it once.)
 
 ## Notes and limitations
 
