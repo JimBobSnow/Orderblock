@@ -190,6 +190,9 @@ input[type="file"] { color: var(--text-dim); font-size: 0.85rem; }
 .filter-group { margin-top: 14px; }
 .filter-group:last-of-type { margin-bottom: 20px; }
 .filter-label { display: block; font-size: 0.78rem; color: var(--text-dim); margin-bottom: 6px; }
+.filter-label-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.filter-label-row .filter-label { margin-bottom: 0; }
+.segmented-sm button { padding: 4px 10px; font-size: 0.72rem; }
 
 .tag-chip {
   border: 1px solid var(--border);
@@ -208,6 +211,7 @@ input[type="file"] { color: var(--text-dim); font-size: 0.85rem; }
 .list-header { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
 .list-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin: 28px 0 4px; }
 .list-header-row h2 { margin: 0; }
+.list-header-actions { display: flex; gap: 10px; }
 .empty-state { color: var(--text-dim); padding: 30px 0; text-align: center; }
 .entry-list { display: flex; flex-direction: column; gap: 18px; }
 

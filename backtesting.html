@@ -15,10 +15,19 @@
 
     <section class="list-header-row">
       <h2>Latest sessions</h2>
-      <button type="button" id="start-session-btn" class="btn btn-primary">+ Upload session</button>
+      <div class="list-header-actions">
+        <button type="button" id="edit-tags-btn" class="btn btn-ghost">✏ Edit tags</button>
+        <button type="button" id="start-session-btn" class="btn btn-primary">+ Upload session</button>
+      </div>
     </section>
     <div class="filter-group">
-      <span class="filter-label">Tag</span>
+      <div class="filter-label-row">
+        <span class="filter-label">Tag</span>
+        <div class="segmented segmented-sm" id="tag-match-toggle">
+          <button type="button" data-mode="subset" class="active">Contains selected</button>
+          <button type="button" data-mode="exact">Exact match</button>
+        </div>
+      </div>
       <div id="filter-bar" class="tag-row filter-row"></div>
     </div>
     <div class="filter-group">

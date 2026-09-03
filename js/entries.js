@@ -55,6 +55,73 @@ function openLightbox(src) {
   lb.classList.remove('hidden');
 }
 
+// --- Global tag manager ------------------------------------------------------
+
+function openTagManager(ctx) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Edit tags</h2>
+        <button type="button" class="btn-icon" id="tags-close" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint">These are the default tags anyone can pick from when logging a trade, shared across Trading and Backtesting. Changes apply everywhere immediately — click a tag to remove it.</p>
+        <div id="tags-list" class="tag-row"></div>
+        <div class="tag-add-row">
+          <input type="text" id="new-tag-input" placeholder="Add a new tag and press Enter" />
+          <button type="button" id="new-tag-btn" class="btn btn-ghost">+ Add tag</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#tags-close').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  let tags = [...ctx.tags];
+
+  function renderTagsList() {
+    const wrap = overlay.querySelector('#tags-list');
+    wrap.innerHTML = '';
+    if (tags.length === 0) { wrap.innerHTML = '<p class="hint">No default tags yet — add one below.</p>'; return; }
+    tags.forEach((t) => wrap.appendChild(makeTagChip(t, true, removeTag, true)));
+  }
+
+  async function save(mutateFn, successMsg) {
+    try {
+      const updated = await updateJsonFile('data/tags.json', mutateFn, `Update default tags`);
+      tags = updated;
+      renderTagsList();
+      ctx.onChange(tags);
+      toast(successMsg, 'success');
+    } catch (err) {
+      toast(err.message || 'Could not update tags.', 'error');
+    }
+  }
+
+  function removeTag(t) {
+    save((data) => data.filter((x) => x !== t), `Removed "${t}".`);
+  }
+
+  function addTagFromInput() {
+    const input = overlay.querySelector('#new-tag-input');
+    const val = input.value.trim();
+    if (!val) return;
+    if (tags.includes(val)) { toast('That tag already exists.', 'error'); return; }
+    input.value = '';
+    save((data) => (data.includes(val) ? data : [...data, val]), `Added "${val}".`);
+  }
+
+  overlay.querySelector('#new-tag-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addTagFromInput(); }
+  });
+  overlay.querySelector('#new-tag-btn').addEventListener('click', addTagFromInput);
+
+  renderTagsList();
+}
+
 // --- Session builder (the "Upload session" modal flow) ---------------------
 
 function openSessionBuilder(ctx) {
@@ -347,13 +414,25 @@ function openSessionBuilder(ctx) {
 // --- Page: session list + filter + comments --------------------------------
 
 export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
-  const state = { entries: [], activeFilterTags: new Set(), activeFilterUploader: null };
+  const state = { entries: [], tags: [], activeFilterTags: new Set(), activeFilterUploader: null, tagMatchMode: 'subset' };
 
   const listEl = document.getElementById('entry-list');
   const emptyEl = document.getElementById('entry-empty');
   const filterBarEl = document.getElementById('filter-bar');
   const uploaderFilterBarEl = document.getElementById('uploader-filter-bar');
+  const tagMatchToggleEl = document.getElementById('tag-match-toggle');
   const startBtn = document.getElementById('start-session-btn');
+  const editTagsBtn = document.getElementById('edit-tags-btn');
+
+  if (tagMatchToggleEl) {
+    tagMatchToggleEl.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.tagMatchMode = btn.dataset.mode;
+        tagMatchToggleEl.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
+        renderList();
+      });
+    });
+  }
 
   startBtn.addEventListener('click', () => {
     openSessionBuilder({
@@ -366,8 +445,17 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
     });
   });
 
+  if (editTagsBtn) {
+    editTagsBtn.addEventListener('click', () => {
+      openTagManager({
+        tags: state.tags,
+        onChange: (updated) => { state.tags = updated; renderFilterBar(); }
+      });
+    });
+  }
+
   function allKnownTags() {
-    const set = new Set(PRESET_TAGS);
+    const set = new Set(state.tags.length ? state.tags : PRESET_TAGS);
     state.entries.forEach((e) => (e.trades || []).forEach((t) => (t.tags || []).forEach((tag) => set.add(tag))));
     return Array.from(set);
   }
@@ -380,7 +468,10 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
 
   function matchesTagFilter(tags) {
     if (state.activeFilterTags.size === 0) return true;
-    return (tags || []).some((tag) => state.activeFilterTags.has(tag));
+    const tagSet = new Set(tags || []);
+    const selected = Array.from(state.activeFilterTags);
+    if (state.tagMatchMode === 'exact') return selected.length === tagSet.size && selected.every((t) => tagSet.has(t));
+    return selected.every((t) => tagSet.has(t));
   }
 
   function renderFilterBar() {
@@ -581,7 +672,10 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
 
   async function load() {
     try {
-      state.entries = await getJson(dataPath, []);
+      [state.entries, state.tags] = await Promise.all([
+        getJson(dataPath, []),
+        getJson('data/tags.json', PRESET_TAGS)
+      ]);
       renderList();
       renderFilterBars();
     } catch (err) {

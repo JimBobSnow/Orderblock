@@ -8,7 +8,7 @@
 // never touch the site's own HTML/JS/CSS, and there's a hard size cap per
 // file. Deploy with `wrangler deploy` — see ../README.md.
 
-const JSON_PATHS = new Set(['data/trades.json', 'data/backtests.json']);
+const JSON_PATHS = new Set(['data/trades.json', 'data/backtests.json', 'data/tags.json']);
 const IMAGE_PATH_RE = /^images\/(trades|backtests)\/[a-f0-9-]{16,160}\.jpg$/i;
 const MAX_BASE64_LENGTH = 6 * 1024 * 1024; // ~4.5MB of actual image data
 
