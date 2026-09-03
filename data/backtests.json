@@ -32,9 +32,9 @@
         "result": "win",
         "tags": [
           "Multi LTF zone",
-          "With Trend",
           "Support/Resistance Zone",
-          "BOS"
+          "BOS",
+          "With trend"
         ],
         "image": "images/backtests/a52aead1-edfc-40ca-8175-9a180e41208b-a81fccd0-c8db-4082-b87c-55d4cad9be54.jpg",
         "imageSha": "7b17124a15ec382b840e4bb29ec10cd834c642a0"
