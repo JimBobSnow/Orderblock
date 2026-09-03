@@ -232,6 +232,7 @@ input[type="file"] { color: var(--text-dim); font-size: 0.85rem; }
 .stat.winrate.bad { color: var(--bad); }
 
 .entry-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.filter-note { margin: 10px 0 0; }
 
 .entry-images { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .entry-thumb { width: 110px; height: 110px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); cursor: zoom-in; }

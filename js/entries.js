@@ -347,7 +347,7 @@ function openSessionBuilder(ctx) {
 // --- Page: session list + filter + comments --------------------------------
 
 export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
-  const state = { entries: [], activeFilterTag: null, activeFilterUploader: null };
+  const state = { entries: [], activeFilterTags: new Set(), activeFilterUploader: null };
 
   const listEl = document.getElementById('entry-list');
   const emptyEl = document.getElementById('entry-empty');
@@ -378,21 +378,30 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }
 
+  function matchesTagFilter(tags) {
+    if (state.activeFilterTags.size === 0) return true;
+    return (tags || []).some((tag) => state.activeFilterTags.has(tag));
+  }
+
   function renderFilterBar() {
     filterBarEl.innerHTML = '';
     const allBtn = document.createElement('button');
     allBtn.type = 'button';
-    allBtn.className = `tag-chip filter ${!state.activeFilterTag ? 'active' : ''}`;
+    allBtn.className = `tag-chip filter ${state.activeFilterTags.size === 0 ? 'active' : ''}`;
     allBtn.textContent = 'All';
-    allBtn.addEventListener('click', () => { state.activeFilterTag = null; renderList(); renderFilterBar(); });
+    allBtn.addEventListener('click', () => { state.activeFilterTags.clear(); renderList(); renderFilterBar(); });
     filterBarEl.appendChild(allBtn);
 
     allKnownTags().forEach((t) => {
       const chip = document.createElement('button');
       chip.type = 'button';
-      chip.className = `tag-chip filter ${state.activeFilterTag === t ? 'active' : ''}`;
+      chip.className = `tag-chip filter ${state.activeFilterTags.has(t) ? 'active' : ''}`;
       chip.textContent = t;
-      chip.addEventListener('click', () => { state.activeFilterTag = t; renderList(); renderFilterBar(); });
+      chip.addEventListener('click', () => {
+        if (state.activeFilterTags.has(t)) state.activeFilterTags.delete(t); else state.activeFilterTags.add(t);
+        renderList();
+        renderFilterBar();
+      });
       filterBarEl.appendChild(chip);
     });
   }
@@ -460,6 +469,9 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
 
   function renderCard(entry) {
     const stats = computeStats(entry.trades);
+    const allTrades = entry.trades || [];
+    const visibleTrades = allTrades.filter((t) => matchesTagFilter(t.tags));
+    const isFiltered = state.activeFilterTags.size > 0 && visibleTrades.length !== allTrades.length;
     const card = document.createElement('article');
     card.className = 'entry-card';
     const winClass = stats.winrate >= 60 ? 'good' : stats.winrate >= 45 ? 'mid' : 'bad';
@@ -476,8 +488,9 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
           <button type="button" class="btn-icon delete-session-btn" title="Delete session" aria-label="Delete session">🗑</button>
         </div>
       </div>
+      ${isFiltered ? `<p class="hint filter-note">Showing ${visibleTrades.length} of ${allTrades.length} trades matching the tag filter</p>` : ''}
       <div class="trade-grid">
-        ${(entry.trades || []).map((t) => `
+        ${visibleTrades.map((t) => `
           <div class="trade-chip" data-trade-id="${escapeHtml(t.id)}">
             <div class="trade-thumb-wrap">
               <img class="trade-thumb" src="${rawUrl(t.image)}" data-full="${rawUrl(t.image)}" loading="lazy" alt="${t.result === 'win' ? 'Winning' : 'Losing'} trade screenshot" />
@@ -556,7 +569,7 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
 
   function renderList() {
     const visible = state.entries
-      .filter((e) => !state.activeFilterTag || (e.trades || []).some((t) => (t.tags || []).includes(state.activeFilterTag)))
+      .filter((e) => state.activeFilterTags.size === 0 || (e.trades || []).some((t) => matchesTagFilter(t.tags)))
       .filter((e) => !state.activeFilterUploader || e.uploader === state.activeFilterUploader)
       .slice()
       .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
