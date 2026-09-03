@@ -7,7 +7,7 @@ import { getJson, toast } from './store.js';
 
 let trades = [];
 let backtests = [];
-let source = 'both';
+let source = 'trading';
 let chartTags = null;
 let chartUploaders = null;
 let chartWinLoss = null;

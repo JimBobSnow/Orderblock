@@ -39,12 +39,30 @@ function makeTagChip(tag, active, onClick, removable) {
   return chip;
 }
 
+function openLightbox(src) {
+  let lb = document.getElementById('lightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'lightbox';
+    lb.className = 'lightbox hidden';
+    lb.innerHTML = `<img id="lightbox-img" alt="Full size trade screenshot" /><button id="lightbox-close" type="button" class="btn-icon" aria-label="Close">✕</button>`;
+    document.body.appendChild(lb);
+    lb.addEventListener('click', (e) => {
+      if (e.target === lb || e.target.id === 'lightbox-close') lb.classList.add('hidden');
+    });
+  }
+  document.getElementById('lightbox-img').src = src;
+  lb.classList.remove('hidden');
+}
+
 // --- Session builder (the "Upload session" modal flow) ---------------------
 
 function openSessionBuilder(ctx) {
   const session = { id: uuid(), uploader: getLastName(), date: new Date().toISOString().slice(0, 10), trades: [] };
+  const knownTags = new Set(ctx.knownTags && ctx.knownTags.length ? ctx.knownTags : PRESET_TAGS);
   let mode = 'idle'; // 'idle' | 'adding'
-  let pending = { file: null, result: null, tags: new Set() };
+  let editingId = null;
+  let pending = { file: null, result: null, tags: new Set(), previewUrl: null };
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -74,8 +92,7 @@ function openSessionBuilder(ctx) {
     const wrap = body.querySelector('#trade-tags');
     if (!wrap) return;
     wrap.innerHTML = '';
-    PRESET_TAGS.forEach((t) => wrap.appendChild(makeTagChip(t, pending.tags.has(t), toggleTradeTag)));
-    Array.from(pending.tags).filter((t) => !PRESET_TAGS.includes(t)).forEach((t) => wrap.appendChild(makeTagChip(t, true, toggleTradeTag, true)));
+    Array.from(knownTags).forEach((t) => wrap.appendChild(makeTagChip(t, pending.tags.has(t), toggleTradeTag)));
   }
 
   function toggleTradeTag(tag) {
@@ -86,19 +103,51 @@ function openSessionBuilder(ctx) {
   function addPendingTagFromInput() {
     const input = body.querySelector('#trade-tag-input');
     const val = input.value.trim();
-    if (val) { pending.tags.add(val); input.value = ''; renderTradeTags(); }
+    if (val) {
+      pending.tags.add(val);
+      knownTags.add(val); // a newly-used tag becomes one of the selectable default tags from here on
+      input.value = '';
+      renderTradeTags();
+    }
+  }
+
+  function renderFilePreview() {
+    const preview = body.querySelector('#trade-file-preview');
+    if (!preview) return;
+    preview.innerHTML = '';
+    if (pending.previewUrl) {
+      const img = document.createElement('img');
+      img.className = 'file-thumb';
+      img.src = pending.previewUrl;
+      img.title = 'Click to view full size';
+      img.addEventListener('click', () => openLightbox(pending.previewUrl));
+      preview.appendChild(img);
+    }
+  }
+
+  function resetPending() {
+    editingId = null;
+    pending = { file: null, result: null, tags: new Set(), previewUrl: null };
+  }
+
+  function startEditTrade(trade) {
+    editingId = trade.id;
+    pending = { file: null, result: trade.result, tags: new Set(trade.tags || []), previewUrl: trade.previewUrl };
+    mode = 'adding';
+    renderBody();
   }
 
   function renderBody() {
     const stats = computeStats(session.trades);
 
     if (mode === 'adding') {
+      const isEditing = !!editingId;
       body.innerHTML = `
         <div class="session-meta-row">
           <label>Uploader name<input type="text" id="s-uploader" value="${escapeHtml(session.uploader)}" /></label>
           <label>Date<input type="date" id="s-date" value="${session.date}" /></label>
         </div>
-        <h3 class="trade-form-title">Add trade ${session.trades.length + 1}</h3>
+        <h3 class="trade-form-title">${isEditing ? 'Edit trade' : `Add trade ${session.trades.length + 1}`}</h3>
 
         <label class="block-label">Screenshot</label>
         <input type="file" id="trade-file" accept="image/*" />
@@ -106,8 +155,8 @@ function openSessionBuilder(ctx) {
 
         <label class="block-label">Result</label>
         <div class="result-toggle">
-          <button type="button" class="result-btn win" data-result="win">✓ Win</button>
-          <button type="button" class="result-btn loss" data-result="loss">✕ Loss</button>
+          <button type="button" class="result-btn win ${pending.result === 'win' ? 'active' : ''}" data-result="win">✓ Win</button>
+          <button type="button" class="result-btn loss ${pending.result === 'loss' ? 'active' : ''}" data-result="loss">✕ Loss</button>
         </div>
 
         <label class="block-label">Tags</label>
@@ -119,25 +168,22 @@ function openSessionBuilder(ctx) {
 
         <div class="form-actions builder-actions">
           <button type="button" id="trade-cancel-btn" class="btn btn-secondary">Cancel</button>
-          <button type="button" id="trade-complete-btn" class="btn btn-primary">Complete trade</button>
+          ${isEditing ? '<button type="button" id="trade-remove-btn" class="btn btn-danger">Remove trade</button>' : ''}
+          <button type="button" id="trade-complete-btn" class="btn btn-primary">${isEditing ? 'Save changes' : 'Complete trade'}</button>
         </div>
       `;
 
       body.querySelector('#s-uploader').addEventListener('input', (e) => { session.uploader = e.target.value; });
       body.querySelector('#s-date').addEventListener('input', (e) => { session.date = e.target.value; });
 
+      renderFilePreview();
       body.querySelector('#trade-file').addEventListener('change', (e) => {
-        pending.file = e.target.files[0] || null;
-        const preview = body.querySelector('#trade-file-preview');
-        preview.innerHTML = '';
-        if (pending.file) {
-          const img = document.createElement('img');
-          img.className = 'file-thumb';
-          const reader = new FileReader();
-          reader.onload = (ev) => { img.src = ev.target.result; };
-          reader.readAsDataURL(pending.file);
-          preview.appendChild(img);
-        }
+        const file = e.target.files[0] || null;
+        if (!file) return;
+        pending.file = file;
+        const reader = new FileReader();
+        reader.onload = (ev) => { pending.previewUrl = ev.target.result; renderFilePreview(); };
+        reader.readAsDataURL(file);
       });
 
       // Toggle active state directly (no full re-render) so the file input
@@ -156,11 +202,13 @@ function openSessionBuilder(ctx) {
       body.querySelector('#trade-add-tag-btn').addEventListener('click', addPendingTagFromInput);
 
       body.querySelector('#trade-cancel-btn').addEventListener('click', () => {
-        pending = { file: null, result: null, tags: new Set() };
+        resetPending();
         mode = 'idle';
         renderBody();
       });
-      body.querySelector('#trade-complete-btn').addEventListener('click', completeTrade);
+      const removeBtn = body.querySelector('#trade-remove-btn');
+      if (removeBtn) removeBtn.addEventListener('click', removeEditingTrade);
+      body.querySelector('#trade-complete-btn').addEventListener('click', saveTrade);
     } else {
       body.innerHTML = `
         <div class="session-meta-row">
@@ -176,7 +224,7 @@ function openSessionBuilder(ctx) {
           </div>
           <div class="logged-trades-row">
             ${session.trades.map((t, i) => `
-              <div class="logged-trade-chip">
+              <div class="logged-trade-chip" data-trade-id="${escapeHtml(t.id)}" title="Click to edit">
                 <img src="${t.previewUrl}" alt="Trade ${i + 1}" />
                 <span class="result-badge ${t.result}">${t.result === 'win' ? 'W' : 'L'}</span>
               </div>
@@ -193,35 +241,77 @@ function openSessionBuilder(ctx) {
       body.querySelector('#s-uploader').addEventListener('input', (e) => { session.uploader = e.target.value; });
       body.querySelector('#s-date').addEventListener('input', (e) => { session.date = e.target.value; });
       body.querySelector('#add-trade-btn').addEventListener('click', () => {
-        pending = { file: null, result: null, tags: new Set() };
+        resetPending();
         mode = 'adding';
         renderBody();
+      });
+      body.querySelectorAll('.logged-trade-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          const trade = session.trades.find((t) => t.id === chip.dataset.tradeId);
+          if (trade) startEditTrade(trade);
+        });
       });
       const finishBtn = body.querySelector('#finish-session-btn');
       if (finishBtn) finishBtn.addEventListener('click', finishSession);
     }
   }
 
-  async function completeTrade() {
-    if (!pending.file) { toast('Choose a screenshot for this trade.', 'error'); return; }
+  function removeEditingTrade() {
+    const idx = session.trades.findIndex((t) => t.id === editingId);
+    if (idx !== -1) {
+      const [removed] = session.trades.splice(idx, 1);
+      if (removed.imageSha) deleteFile(removed.image, removed.imageSha, `${ctx.commitPrefix}: cleanup removed photo`).catch(() => {});
+    }
+    resetPending();
+    mode = 'idle';
+    renderBody();
+    toast('Trade removed.', 'success');
+  }
+
+  async function saveTrade() {
+    const existingTrade = editingId ? session.trades.find((t) => t.id === editingId) : null;
+    if (!editingId && !pending.file) { toast('Choose a screenshot for this trade.', 'error'); return; }
     if (!pending.result) { toast('Mark this trade as a win or a loss.', 'error'); return; }
 
-    const completeBtn = body.querySelector('#trade-complete-btn');
-    completeBtn.disabled = true;
-    completeBtn.textContent = 'Uploading…';
+    const saveBtn = body.querySelector('#trade-complete-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = pending.file ? 'Uploading…' : 'Saving…';
     try {
-      const tradeId = uuid();
-      const path = `${ctx.imageDir}/${session.id}-${tradeId}.jpg`;
-      const uploadRes = await uploadImageFile(pending.file, path, `${ctx.commitPrefix}: trade photo for ${session.uploader || 'session'}`);
-      session.trades.push({ id: tradeId, result: pending.result, tags: Array.from(pending.tags), image: path, imageSha: uploadRes.sha, previewUrl: rawUrl(path) });
-      pending = { file: null, result: null, tags: new Set() };
+      let image;
+      let imageSha;
+      let previewUrl;
+
+      if (pending.file) {
+        const path = `${ctx.imageDir}/${session.id}-${uuid()}.jpg`;
+        const uploadRes = await uploadImageFile(pending.file, path, `${ctx.commitPrefix}: trade photo for ${session.uploader || 'session'}`);
+        image = path;
+        imageSha = uploadRes.sha;
+        previewUrl = rawUrl(path);
+        if (existingTrade && existingTrade.imageSha) {
+          deleteFile(existingTrade.image, existingTrade.imageSha, `${ctx.commitPrefix}: cleanup replaced photo`).catch(() => {});
+        }
+      } else if (existingTrade) {
+        ({ image, imageSha, previewUrl } = existingTrade);
+      }
+
+      const tradeRecord = { id: editingId || uuid(), result: pending.result, tags: Array.from(pending.tags), image, imageSha, previewUrl };
+
+      if (editingId) {
+        const idx = session.trades.findIndex((t) => t.id === editingId);
+        if (idx !== -1) session.trades[idx] = tradeRecord;
+      } else {
+        session.trades.push(tradeRecord);
+      }
+
+      const wasEditing = !!editingId;
+      resetPending();
       mode = 'idle';
       renderBody();
-      toast('Trade added to session.', 'success');
+      toast(wasEditing ? 'Trade updated.' : 'Trade added to session.', 'success');
     } catch (err) {
-      toast(err.message || 'Could not upload trade photo.', 'error');
-      completeBtn.disabled = false;
-      completeBtn.textContent = 'Complete trade';
+      toast(err.message || 'Could not save trade.', 'error');
+      saveBtn.disabled = false;
+      saveBtn.textContent = editingId ? 'Save changes' : 'Complete trade';
     }
   }
 
@@ -270,6 +360,7 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
       imageDir,
       entryNoun,
       commitPrefix,
+      knownTags: allKnownTags(),
       onFinished: (updated) => { state.entries = updated; renderList(); renderFilterBar(); }
     });
   });
@@ -297,22 +388,6 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
       chip.addEventListener('click', () => { state.activeFilterTag = t; renderList(); renderFilterBar(); });
       filterBarEl.appendChild(chip);
     });
-  }
-
-  function openLightbox(src) {
-    let lb = document.getElementById('lightbox');
-    if (!lb) {
-      lb = document.createElement('div');
-      lb.id = 'lightbox';
-      lb.className = 'lightbox hidden';
-      lb.innerHTML = `<img id="lightbox-img" alt="Full size trade screenshot" /><button id="lightbox-close" type="button" class="btn-icon" aria-label="Close">✕</button>`;
-      document.body.appendChild(lb);
-      lb.addEventListener('click', (e) => {
-        if (e.target === lb || e.target.id === 'lightbox-close') lb.classList.add('hidden');
-      });
-    }
-    document.getElementById('lightbox-img').src = src;
-    lb.classList.remove('hidden');
   }
 
   async function deleteSession(entry) {

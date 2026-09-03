@@ -119,6 +119,8 @@ a { color: var(--accent); }
 .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: none; color: #fff; }
 .btn-secondary { background: transparent; border: 1px solid var(--border); }
 .btn-ghost { background: transparent; border: 1px solid var(--border); }
+.btn-danger { background: transparent; border: 1px solid var(--bad); color: var(--bad); }
+.btn-danger:hover { background: rgba(231, 76, 60, 0.12); }
 .btn-icon { background: transparent; border: none; color: var(--text-dim); font-size: 1rem; cursor: pointer; padding: 4px 8px; }
 
 /* Cards */
@@ -178,7 +180,7 @@ input[type="file"] { color: var(--text-dim); font-size: 0.85rem; }
 .tag-add-row input { flex: 1; }
 
 .file-preview-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 18px; }
-.file-thumb { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+.file-thumb { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); cursor: zoom-in; }
 
 .form-actions { margin-top: 8px; }
 
@@ -283,7 +285,8 @@ input[type="file"] { color: var(--text-dim); font-size: 0.85rem; }
 
 .session-tally { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
 .logged-trades-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-.logged-trade-chip { position: relative; width: 64px; height: 64px; }
+.logged-trade-chip { position: relative; width: 64px; height: 64px; cursor: pointer; }
+.logged-trade-chip:hover img { outline: 2px solid var(--accent); }
 .logged-trade-chip img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
 .logged-trade-chip .result-badge { width: 18px; height: 18px; font-size: 0.65rem; top: 4px; left: 4px; }
 
