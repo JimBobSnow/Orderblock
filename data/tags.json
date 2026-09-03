@@ -1,6 +1,39 @@
 [
-  { "group": "Market Structure", "tags": ["BOS", "CHOC"] },
-  { "group": "Trend", "tags": ["With Trend", "Against Trend"] },
-  { "group": "Setup", "tags": ["Swing"] },
-  { "group": "Confirmation", "tags": ["LTF SNR", "Support/Resistance Zone", "LTF orderblock", "LTF supply/demand", "LTF doji", "LTF overlap", "Multi LTF zone", "Single LTF zone"] }
+  {
+    "group": "Market Structure",
+    "tags": [
+      "BOS",
+      "CHOC"
+    ]
+  },
+  {
+    "group": "Trend",
+    "tags": [
+      "With Trend",
+      "Against Trend"
+    ]
+  },
+  {
+    "group": "Setup",
+    "tags": [
+      "Swing"
+    ]
+  },
+  {
+    "group": "Confirmation",
+    "tags": [
+      "LTF SNR",
+      "Support/Resistance Zone",
+      "LTF orderblock",
+      "LTF supply/demand",
+      "LTF doji",
+      "LTF overlap",
+      "Multi LTF zone",
+      "Single LTF zone"
+    ]
+  },
+  {
+    "group": "LTF",
+    "tags": []
+  }
 ]
