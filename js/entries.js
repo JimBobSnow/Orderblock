@@ -8,7 +8,31 @@
 
 import { getLastName, setLastName, getJson, updateJsonFile, uploadImageFile, deleteFile, uuid, toast, rawUrl } from './store.js';
 
-const PRESET_TAGS = ['BOS', 'CHOCH', 'Support/Resistance', 'Swing', 'With trend', 'Against trend'];
+const PRESET_TAG_GROUPS = [
+  { group: 'Market Structure', tags: ['BOS', 'CHOCH'] },
+  { group: 'Trend', tags: ['With trend', 'Against trend'] },
+  { group: 'Setup', tags: ['Swing'] },
+  { group: 'Confirmation', tags: ['Support/Resistance'] }
+];
+
+function flattenTagGroups(groups) {
+  const set = new Set();
+  (groups || []).forEach((g) => (g.tags || []).forEach((t) => set.add(t)));
+  return Array.from(set);
+}
+
+// Clones a groups array and buckets any tag not already in a group into an
+// "Other" group, so historical/ad-hoc tags still show up somewhere pickable.
+function tagGroupsWithExtras(groups, extraTags) {
+  const cloned = (groups && groups.length ? groups : PRESET_TAG_GROUPS).map((g) => ({ group: g.group, tags: [...g.tags] }));
+  const known = new Set(flattenTagGroups(cloned));
+  const extras = (extraTags || []).filter((t) => !known.has(t));
+  if (extras.length === 0) return cloned;
+  const other = cloned.find((g) => g.group === 'Other');
+  if (other) extras.forEach((t) => other.tags.push(t));
+  else cloned.push({ group: 'Other', tags: extras });
+  return cloned;
+}
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -39,6 +63,26 @@ function makeTagChip(tag, active, onClick, removable) {
   return chip;
 }
 
+// Renders a grouped, toggle-select tag picker into `container`. Used by both
+// the session builder's trade form and the saved-trade tag editor.
+function renderGroupedTagPicker(container, groups, isSelected, onToggle) {
+  container.innerHTML = '';
+  groups.forEach(({ group, tags }) => {
+    if (!tags.length) return;
+    const section = document.createElement('div');
+    section.className = 'tag-group';
+    const label = document.createElement('div');
+    label.className = 'tag-group-label';
+    label.textContent = group;
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    tags.forEach((t) => row.appendChild(makeTagChip(t, isSelected(t), onToggle)));
+    section.appendChild(label);
+    section.appendChild(row);
+    container.appendChild(section);
+  });
+}
+
 function openLightbox(src) {
   let lb = document.getElementById('lightbox');
   if (!lb) {
@@ -61,17 +105,17 @@ function openTagManager(ctx) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
-    <div class="modal">
+    <div class="modal tag-manager-modal">
       <div class="modal-header">
         <h2>Edit tags</h2>
         <button type="button" class="btn-icon" id="tags-close" aria-label="Close">✕</button>
       </div>
       <div class="modal-body">
-        <p class="hint">These are the default tags anyone can pick from when logging a trade, shared across Trading and Backtesting. Changes apply everywhere immediately — click a tag to remove it.</p>
-        <div id="tags-list" class="tag-row"></div>
+        <p class="hint">Organize the default tags into groups (e.g. Market Structure, Confirmation) — shared across Trading and Backtesting. Changes apply everywhere immediately.</p>
+        <div id="tag-groups-list"></div>
         <div class="tag-add-row">
-          <input type="text" id="new-tag-input" placeholder="Add a new tag and press Enter" />
-          <button type="button" id="new-tag-btn" class="btn btn-ghost">+ Add tag</button>
+          <input type="text" id="new-group-input" placeholder="New group name and press Enter" />
+          <button type="button" id="new-group-btn" class="btn btn-ghost">+ Add group</button>
         </div>
       </div>
     </div>
@@ -80,51 +124,95 @@ function openTagManager(ctx) {
   overlay.querySelector('#tags-close').addEventListener('click', () => overlay.remove());
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
-  let tags = [...ctx.tags];
+  let groups = (ctx.groups && ctx.groups.length ? ctx.groups : PRESET_TAG_GROUPS).map((g) => ({ group: g.group, tags: [...g.tags] }));
 
-  function renderTagsList() {
-    const wrap = overlay.querySelector('#tags-list');
+  function render() {
+    const wrap = overlay.querySelector('#tag-groups-list');
     wrap.innerHTML = '';
-    if (tags.length === 0) { wrap.innerHTML = '<p class="hint">No default tags yet — add one below.</p>'; return; }
-    tags.forEach((t) => wrap.appendChild(makeTagChip(t, true, removeTag, true)));
+    if (groups.length === 0) { wrap.innerHTML = '<p class="hint">No groups yet — add one below.</p>'; return; }
+
+    groups.forEach(({ group, tags }) => {
+      const block = document.createElement('div');
+      block.className = 'tag-group-block';
+      block.innerHTML = `
+        <div class="tag-group-header">
+          <h4>${escapeHtml(group)}</h4>
+          <button type="button" class="btn-icon remove-group-btn" title="Remove group" aria-label="Remove group">🗑</button>
+        </div>
+        <div class="tag-row group-tags"></div>
+        <div class="tag-add-row">
+          <input type="text" class="group-tag-input" placeholder="Add tag to ${escapeHtml(group)} and press Enter" />
+          <button type="button" class="btn btn-ghost group-tag-add-btn">+ Add</button>
+        </div>
+      `;
+      const tagRow = block.querySelector('.group-tags');
+      if (tags.length === 0) tagRow.innerHTML = '<p class="hint">No tags in this group yet.</p>';
+      else tags.forEach((t) => tagRow.appendChild(makeTagChip(t, true, () => removeTag(group, t), true)));
+
+      block.querySelector('.remove-group-btn').addEventListener('click', () => removeGroup(group, tags.length));
+
+      const input = block.querySelector('.group-tag-input');
+      const addHandler = () => {
+        const val = input.value.trim();
+        if (!val) return;
+        input.value = '';
+        addTag(group, val);
+      };
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addHandler(); } });
+      block.querySelector('.group-tag-add-btn').addEventListener('click', addHandler);
+
+      wrap.appendChild(block);
+    });
   }
 
   async function save(mutateFn, successMsg) {
     try {
-      const updated = await updateJsonFile('data/tags.json', mutateFn, `Update default tags`);
-      tags = updated;
-      renderTagsList();
-      ctx.onChange(tags);
+      const updated = await updateJsonFile('data/tags.json', mutateFn, 'Update tag groups');
+      groups = updated;
+      render();
+      ctx.onChange(groups);
       toast(successMsg, 'success');
     } catch (err) {
       toast(err.message || 'Could not update tags.', 'error');
     }
   }
 
-  function removeTag(t) {
-    save((data) => data.filter((x) => x !== t), `Removed "${t}".`);
+  function addTag(groupName, tag) {
+    save((data) => data.map((g) => (g.group === groupName ? { ...g, tags: g.tags.includes(tag) ? g.tags : [...g.tags, tag] } : g)), `Added "${tag}" to ${groupName}.`);
   }
 
-  function addTagFromInput() {
-    const input = overlay.querySelector('#new-tag-input');
+  function removeTag(groupName, tag) {
+    save((data) => data.map((g) => (g.group === groupName ? { ...g, tags: g.tags.filter((t) => t !== tag) } : g)), `Removed "${tag}".`);
+  }
+
+  function removeGroup(groupName, tagCount) {
+    if (tagCount > 0) {
+      const ok = window.confirm(`Remove "${groupName}" and its ${tagCount} tag${tagCount === 1 ? '' : 's'}?`);
+      if (!ok) return;
+    }
+    save((data) => data.filter((g) => g.group !== groupName), `Removed group "${groupName}".`);
+  }
+
+  function addGroup() {
+    const input = overlay.querySelector('#new-group-input');
     const val = input.value.trim();
     if (!val) return;
-    if (tags.includes(val)) { toast('That tag already exists.', 'error'); return; }
+    if (groups.some((g) => g.group === val)) { toast('That group already exists.', 'error'); return; }
     input.value = '';
-    save((data) => (data.includes(val) ? data : [...data, val]), `Added "${val}".`);
+    save((data) => (data.some((g) => g.group === val) ? data : [...data, { group: val, tags: [] }]), `Added group "${val}".`);
   }
 
-  overlay.querySelector('#new-tag-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); addTagFromInput(); }
+  overlay.querySelector('#new-group-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addGroup(); }
   });
-  overlay.querySelector('#new-tag-btn').addEventListener('click', addTagFromInput);
+  overlay.querySelector('#new-group-btn').addEventListener('click', addGroup);
 
-  renderTagsList();
+  render();
 }
 
 // --- Editing tags on an already-saved trade ---------------------------------
 
-function openTradeTagEditor({ dataPath, commitPrefix, entryId, trade, knownTags, onSaved }) {
+function openTradeTagEditor({ dataPath, commitPrefix, entryId, trade, knownTagGroups, onSaved }) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   const thumbSrc = rawUrl(trade.image);
@@ -154,15 +242,14 @@ function openTradeTagEditor({ dataPath, commitPrefix, entryId, trade, knownTags,
   overlay.querySelector('#trade-tags-thumb').addEventListener('click', () => openLightbox(thumbSrc));
 
   const selected = new Set(trade.tags || []);
-  const known = new Set([...(knownTags || []), ...selected]);
+  const groups = tagGroupsWithExtras(knownTagGroups, Array.from(selected));
 
   function renderChips() {
     const wrap = overlay.querySelector('#edit-trade-tags');
-    wrap.innerHTML = '';
-    Array.from(known).forEach((t) => wrap.appendChild(makeTagChip(t, selected.has(t), (tag) => {
+    renderGroupedTagPicker(wrap, groups, (t) => selected.has(t), (tag) => {
       if (selected.has(tag)) selected.delete(tag); else selected.add(tag);
       renderChips();
-    })));
+    });
   }
   renderChips();
 
@@ -171,7 +258,9 @@ function openTradeTagEditor({ dataPath, commitPrefix, entryId, trade, knownTags,
     const val = input.value.trim();
     if (!val) return;
     selected.add(val);
-    known.add(val);
+    let other = groups.find((g) => g.group === 'Other');
+    if (!other) { other = { group: 'Other', tags: [] }; groups.push(other); }
+    if (!other.tags.includes(val)) other.tags.push(val);
     input.value = '';
     renderChips();
   }
@@ -207,7 +296,7 @@ function openTradeTagEditor({ dataPath, commitPrefix, entryId, trade, knownTags,
 
 function openSessionBuilder(ctx) {
   const session = { id: uuid(), uploader: getLastName(), date: new Date().toISOString().slice(0, 10), trades: [] };
-  const knownTags = new Set(ctx.knownTags && ctx.knownTags.length ? ctx.knownTags : PRESET_TAGS);
+  const knownGroups = (ctx.knownTagGroups && ctx.knownTagGroups.length ? ctx.knownTagGroups : PRESET_TAG_GROUPS).map((g) => ({ group: g.group, tags: [...g.tags] }));
   let mode = 'idle'; // 'idle' | 'adding'
   let editingId = null;
   let pending = { file: null, result: null, tags: new Set(), previewUrl: null };
@@ -239,8 +328,7 @@ function openSessionBuilder(ctx) {
   function renderTradeTags() {
     const wrap = body.querySelector('#trade-tags');
     if (!wrap) return;
-    wrap.innerHTML = '';
-    Array.from(knownTags).forEach((t) => wrap.appendChild(makeTagChip(t, pending.tags.has(t), toggleTradeTag)));
+    renderGroupedTagPicker(wrap, knownGroups, (t) => pending.tags.has(t), toggleTradeTag);
   }
 
   function toggleTradeTag(tag) {
@@ -253,7 +341,10 @@ function openSessionBuilder(ctx) {
     const val = input.value.trim();
     if (val) {
       pending.tags.add(val);
-      knownTags.add(val); // a newly-used tag becomes one of the selectable default tags from here on
+      // a newly-used tag becomes selectable for the rest of this session, bucketed under "Other"
+      let other = knownGroups.find((g) => g.group === 'Other');
+      if (!other) { other = { group: 'Other', tags: [] }; knownGroups.push(other); }
+      if (!other.tags.includes(val)) other.tags.push(val);
       input.value = '';
       renderTradeTags();
     }
@@ -495,7 +586,7 @@ function openSessionBuilder(ctx) {
 // --- Page: session list + filter + comments --------------------------------
 
 export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
-  const state = { entries: [], tags: [], activeFilterTags: new Set(), activeFilterUploader: null, tagMatchMode: 'subset' };
+  const state = { entries: [], tagGroups: [], activeFilterTags: new Set(), activeFilterUploader: null, tagMatchMode: 'subset' };
 
   const listEl = document.getElementById('entry-list');
   const emptyEl = document.getElementById('entry-empty');
@@ -521,7 +612,7 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
       imageDir,
       entryNoun,
       commitPrefix,
-      knownTags: allKnownTags(),
+      knownTagGroups: allKnownTagGroups(),
       onFinished: (updated) => { state.entries = updated; renderList(); renderFilterBars(); }
     });
   });
@@ -529,16 +620,20 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
   if (editTagsBtn) {
     editTagsBtn.addEventListener('click', () => {
       openTagManager({
-        tags: state.tags,
-        onChange: (updated) => { state.tags = updated; renderFilterBar(); }
+        groups: state.tagGroups,
+        onChange: (updated) => { state.tagGroups = updated; renderFilterBar(); }
       });
     });
   }
 
   function allKnownTags() {
-    const set = new Set(state.tags.length ? state.tags : PRESET_TAGS);
+    const set = new Set(flattenTagGroups(state.tagGroups.length ? state.tagGroups : PRESET_TAG_GROUPS));
     state.entries.forEach((e) => (e.trades || []).forEach((t) => (t.tags || []).forEach((tag) => set.add(tag))));
     return Array.from(set);
+  }
+
+  function allKnownTagGroups() {
+    return tagGroupsWithExtras(state.tagGroups, allKnownTags());
   }
 
   function allKnownUploaders() {
@@ -718,7 +813,7 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
           commitPrefix,
           entryId: entry.id,
           trade,
-          knownTags: allKnownTags(),
+          knownTagGroups: allKnownTagGroups(),
           onSaved: (updated) => { state.entries = updated; renderList(); renderFilterBars(); }
         });
       });
@@ -771,9 +866,9 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
 
   async function load() {
     try {
-      [state.entries, state.tags] = await Promise.all([
+      [state.entries, state.tagGroups] = await Promise.all([
         getJson(dataPath, []),
-        getJson('data/tags.json', PRESET_TAGS)
+        getJson('data/tags.json', PRESET_TAG_GROUPS)
       ]);
       renderList();
       renderFilterBars();

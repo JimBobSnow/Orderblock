@@ -179,6 +179,16 @@ input[type="file"] { color: var(--text-dim); font-size: 0.85rem; }
 .tag-add-row { display: flex; gap: 8px; margin: 10px 0 18px; }
 .tag-add-row input { flex: 1; }
 
+.tag-group { margin-bottom: 14px; }
+.tag-group:last-child { margin-bottom: 0; }
+.tag-group-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 6px; }
+
+.tag-manager-modal { max-width: 520px; }
+.tag-group-block { border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 14px; background: var(--surface-2); }
+.tag-group-block .tag-add-row { margin: 0; }
+.tag-group-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.tag-group-header h4 { margin: 0; font-size: 0.95rem; }
+
 .file-preview-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 18px; }
 .file-thumb { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); cursor: zoom-in; }
 
