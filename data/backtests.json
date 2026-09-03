@@ -61,7 +61,14 @@
         "imageSha": "7b17124a15ec382b840e4bb29ec10cd834c642a0"
       }
     ],
-    "comments": [],
+    "comments": [
+      {
+        "id": "403c644b-8eeb-4eaa-97d7-11880d1c1d84",
+        "author": "Mark",
+        "text": "I have started trying to align overlaping LTF with the support and resistance zones",
+        "date": "2026-09-03"
+      }
+    ],
     "createdAt": "2026-09-03T21:48:55.715Z"
   }
 ]
