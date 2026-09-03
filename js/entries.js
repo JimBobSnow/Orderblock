@@ -347,11 +347,12 @@ function openSessionBuilder(ctx) {
 // --- Page: session list + filter + comments --------------------------------
 
 export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
-  const state = { entries: [], activeFilterTag: null };
+  const state = { entries: [], activeFilterTag: null, activeFilterUploader: null };
 
   const listEl = document.getElementById('entry-list');
   const emptyEl = document.getElementById('entry-empty');
   const filterBarEl = document.getElementById('filter-bar');
+  const uploaderFilterBarEl = document.getElementById('uploader-filter-bar');
   const startBtn = document.getElementById('start-session-btn');
 
   startBtn.addEventListener('click', () => {
@@ -361,7 +362,7 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
       entryNoun,
       commitPrefix,
       knownTags: allKnownTags(),
-      onFinished: (updated) => { state.entries = updated; renderList(); renderFilterBar(); }
+      onFinished: (updated) => { state.entries = updated; renderList(); renderFilterBars(); }
     });
   });
 
@@ -369,6 +370,12 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
     const set = new Set(PRESET_TAGS);
     state.entries.forEach((e) => (e.trades || []).forEach((t) => (t.tags || []).forEach((tag) => set.add(tag))));
     return Array.from(set);
+  }
+
+  function allKnownUploaders() {
+    const set = new Set();
+    state.entries.forEach((e) => { if (e.uploader) set.add(e.uploader); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }
 
   function renderFilterBar() {
@@ -390,6 +397,31 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
     });
   }
 
+  function renderUploaderFilterBar() {
+    if (!uploaderFilterBarEl) return;
+    uploaderFilterBarEl.innerHTML = '';
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.className = `tag-chip filter ${!state.activeFilterUploader ? 'active' : ''}`;
+    allBtn.textContent = 'All';
+    allBtn.addEventListener('click', () => { state.activeFilterUploader = null; renderList(); renderUploaderFilterBar(); });
+    uploaderFilterBarEl.appendChild(allBtn);
+
+    allKnownUploaders().forEach((name) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = `tag-chip filter ${state.activeFilterUploader === name ? 'active' : ''}`;
+      chip.textContent = name;
+      chip.addEventListener('click', () => { state.activeFilterUploader = name; renderList(); renderUploaderFilterBar(); });
+      uploaderFilterBarEl.appendChild(chip);
+    });
+  }
+
+  function renderFilterBars() {
+    renderFilterBar();
+    renderUploaderFilterBar();
+  }
+
   async function deleteSession(entry) {
     const ok = window.confirm(`Delete this ${entryNoun} session by ${entry.uploader || 'Anonymous'}? This can't be undone.`);
     if (!ok) return;
@@ -397,7 +429,7 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
       const updated = await updateJsonFile(dataPath, (data) => data.filter((x) => x.id !== entry.id), `${commitPrefix}: delete session by ${entry.uploader || 'Anonymous'}`);
       state.entries = updated;
       renderList();
-      renderFilterBar();
+      renderFilterBars();
       toast('Session deleted.', 'success');
       (entry.trades || []).forEach((t) => {
         if (t.imageSha) deleteFile(t.image, t.imageSha, `${commitPrefix}: cleanup photo after session delete`).catch(() => {});
@@ -418,7 +450,7 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
       }, `${commitPrefix}: delete trade from session by ${entry.uploader || 'Anonymous'}`);
       state.entries = updated;
       renderList();
-      renderFilterBar();
+      renderFilterBars();
       toast('Trade deleted.', 'success');
       if (trade.imageSha) deleteFile(trade.image, trade.imageSha, `${commitPrefix}: cleanup photo after trade delete`).catch(() => {});
     } catch (err) {
@@ -525,6 +557,7 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
   function renderList() {
     const visible = state.entries
       .filter((e) => !state.activeFilterTag || (e.trades || []).some((t) => (t.tags || []).includes(state.activeFilterTag)))
+      .filter((e) => !state.activeFilterUploader || e.uploader === state.activeFilterUploader)
       .slice()
       .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
 
@@ -537,7 +570,7 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
     try {
       state.entries = await getJson(dataPath, []);
       renderList();
-      renderFilterBar();
+      renderFilterBars();
     } catch (err) {
       toast(err.message || 'Could not load data from GitHub.', 'error');
     }

@@ -17,7 +17,14 @@
       <h2>Latest sessions</h2>
       <button type="button" id="start-session-btn" class="btn btn-primary">+ Upload session</button>
     </section>
-    <div id="filter-bar" class="tag-row filter-row"></div>
+    <div class="filter-group">
+      <span class="filter-label">Tag</span>
+      <div id="filter-bar" class="tag-row filter-row"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Uploader</span>
+      <div id="uploader-filter-bar" class="tag-row filter-row"></div>
+    </div>
     <div id="entry-empty" class="empty-state hidden">No trading sessions yet — click "Upload session" to add the first one.</div>
     <div id="entry-list" class="entry-list"></div>
   </main>

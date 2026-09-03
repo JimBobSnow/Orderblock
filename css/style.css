@@ -186,7 +186,10 @@ input[type="file"] { color: var(--text-dim); font-size: 0.85rem; }
 
 /* Tag chips */
 .tag-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.filter-row { margin: 14px 0 20px; }
+.filter-row { margin: 6px 0 0; }
+.filter-group { margin-top: 14px; }
+.filter-group:last-of-type { margin-bottom: 20px; }
+.filter-label { display: block; font-size: 0.78rem; color: var(--text-dim); margin-bottom: 6px; }
 
 .tag-chip {
   border: 1px solid var(--border);
