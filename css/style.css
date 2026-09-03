@@ -261,6 +261,11 @@ input[type="file"] { color: var(--text-dim); font-size: 0.85rem; }
 .trade-thumb-wrap:hover .trade-delete-btn { opacity: 1; }
 .trade-delete-btn:hover { background: var(--bad); }
 .trade-chip-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.trade-edit-tags-btn {
+  align-self: flex-start; background: none; border: none; color: var(--text-dim);
+  font-size: 0.72rem; cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 2px;
+}
+.trade-edit-tags-btn:hover { color: var(--accent); }
 .tag-chip.static.mini { padding: 3px 9px; font-size: 0.72rem; }
 
 .entry-comments { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }

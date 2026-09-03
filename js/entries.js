@@ -122,6 +122,87 @@ function openTagManager(ctx) {
   renderTagsList();
 }
 
+// --- Editing tags on an already-saved trade ---------------------------------
+
+function openTradeTagEditor({ dataPath, commitPrefix, entryId, trade, knownTags, onSaved }) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  const thumbSrc = rawUrl(trade.image);
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Edit trade tags</h2>
+        <button type="button" class="btn-icon" id="trade-tags-close" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <img class="file-thumb" id="trade-tags-thumb" src="${thumbSrc}" alt="Trade screenshot" />
+        <label class="block-label" style="margin-top: 14px;">Tags</label>
+        <div id="edit-trade-tags" class="tag-row"></div>
+        <div class="tag-add-row">
+          <input type="text" id="edit-trade-tag-input" placeholder="Add a custom tag and press Enter" />
+          <button type="button" id="edit-trade-add-tag-btn" class="btn btn-ghost">+ Add tag</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="trade-tags-save" class="btn btn-primary">Save tags</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#trade-tags-close').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#trade-tags-thumb').addEventListener('click', () => openLightbox(thumbSrc));
+
+  const selected = new Set(trade.tags || []);
+  const known = new Set([...(knownTags || []), ...selected]);
+
+  function renderChips() {
+    const wrap = overlay.querySelector('#edit-trade-tags');
+    wrap.innerHTML = '';
+    Array.from(known).forEach((t) => wrap.appendChild(makeTagChip(t, selected.has(t), (tag) => {
+      if (selected.has(tag)) selected.delete(tag); else selected.add(tag);
+      renderChips();
+    })));
+  }
+  renderChips();
+
+  function addFromInput() {
+    const input = overlay.querySelector('#edit-trade-tag-input');
+    const val = input.value.trim();
+    if (!val) return;
+    selected.add(val);
+    known.add(val);
+    input.value = '';
+    renderChips();
+  }
+  overlay.querySelector('#edit-trade-tag-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addFromInput(); }
+  });
+  overlay.querySelector('#edit-trade-add-tag-btn').addEventListener('click', addFromInput);
+
+  overlay.querySelector('#trade-tags-save').addEventListener('click', async () => {
+    const saveBtn = overlay.querySelector('#trade-tags-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    try {
+      const newTags = Array.from(selected);
+      const updated = await updateJsonFile(dataPath, (data) => {
+        const targetEntry = data.find((x) => x.id === entryId);
+        const targetTrade = targetEntry && (targetEntry.trades || []).find((t) => t.id === trade.id);
+        if (targetTrade) targetTrade.tags = newTags;
+        return data;
+      }, `${commitPrefix}: edit tags on trade ${trade.id}`);
+      onSaved(updated);
+      overlay.remove();
+      toast('Tags updated.', 'success');
+    } catch (err) {
+      toast(err.message || 'Could not update tags.', 'error');
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save tags';
+    }
+  });
+}
+
 // --- Session builder (the "Upload session" modal flow) ---------------------
 
 function openSessionBuilder(ctx) {
@@ -589,6 +670,7 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
               <button type="button" class="trade-delete-btn" title="Delete trade" aria-label="Delete trade">✕</button>
             </div>
             <div class="trade-chip-tags">${(t.tags || []).map((tag) => `<span class="tag-chip static mini">${escapeHtml(tag)}</span>`).join('')}</div>
+            <button type="button" class="trade-edit-tags-btn">✏ Edit tags</button>
           </div>
         `).join('')}
       </div>
@@ -622,6 +704,23 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
         const tradeId = btn.closest('.trade-chip').dataset.tradeId;
         const trade = (entry.trades || []).find((t) => t.id === tradeId);
         if (trade) deleteTrade(entry, trade);
+      });
+    });
+
+    card.querySelectorAll('.trade-edit-tags-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tradeId = btn.closest('.trade-chip').dataset.tradeId;
+        const trade = (entry.trades || []).find((t) => t.id === tradeId);
+        if (!trade) return;
+        openTradeTagEditor({
+          dataPath,
+          commitPrefix,
+          entryId: entry.id,
+          trade,
+          knownTags: allKnownTags(),
+          onSaved: (updated) => { state.entries = updated; renderList(); renderFilterBars(); }
+        });
       });
     });
 
