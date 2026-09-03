@@ -51,8 +51,9 @@
         "id": "d28ac3e2-41f3-4871-9a06-f62d48d8165b",
         "result": "win",
         "tags": [
+          "Multi LTF zone",
           "Swing",
-          "Support/Resistance",
+          "LTF SNR",
           "With trend"
         ],
         "image": "images/backtests/a52aead1-edfc-40ca-8175-9a180e41208b-d28ac3e2-41f3-4871-9a06-f62d48d8165b.jpg",
