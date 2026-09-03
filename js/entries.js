@@ -15,6 +15,19 @@ const PRESET_TAG_GROUPS = [
   { group: 'Confirmation', tags: ['Support/Resistance'] }
 ];
 
+// Guards against malformed/legacy tag data (e.g. the pre-grouping flat array
+// of tag-name strings, or a stray non-object entry) so a bad read degrades
+// gracefully instead of crashing every tag picker on the page.
+function normalizeTagGroups(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  if (typeof raw[0] === 'string') {
+    return [{ group: 'Tags', tags: raw.filter((t) => typeof t === 'string') }];
+  }
+  return raw
+    .filter((g) => g && typeof g === 'object' && Array.isArray(g.tags))
+    .map((g) => ({ group: String(g.group || 'Other'), tags: g.tags.filter((t) => typeof t === 'string') }));
+}
+
 function flattenTagGroups(groups) {
   const set = new Set();
   (groups || []).forEach((g) => (g.tags || []).forEach((t) => set.add(t)));
@@ -24,7 +37,8 @@ function flattenTagGroups(groups) {
 // Clones a groups array and buckets any tag not already in a group into an
 // "Other" group, so historical/ad-hoc tags still show up somewhere pickable.
 function tagGroupsWithExtras(groups, extraTags) {
-  const cloned = (groups && groups.length ? groups : PRESET_TAG_GROUPS).map((g) => ({ group: g.group, tags: [...g.tags] }));
+  const normalized = normalizeTagGroups(groups);
+  const cloned = (normalized.length ? normalized : PRESET_TAG_GROUPS).map((g) => ({ group: g.group, tags: [...g.tags] }));
   const known = new Set(flattenTagGroups(cloned));
   const extras = (extraTags || []).filter((t) => !known.has(t));
   if (extras.length === 0) return cloned;
@@ -124,7 +138,8 @@ function openTagManager(ctx) {
   overlay.querySelector('#tags-close').addEventListener('click', () => overlay.remove());
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
-  let groups = (ctx.groups && ctx.groups.length ? ctx.groups : PRESET_TAG_GROUPS).map((g) => ({ group: g.group, tags: [...g.tags] }));
+  const normalizedInput = normalizeTagGroups(ctx.groups);
+  let groups = (normalizedInput.length ? normalizedInput : PRESET_TAG_GROUPS).map((g) => ({ group: g.group, tags: [...g.tags] }));
 
   function render() {
     const wrap = overlay.querySelector('#tag-groups-list');
@@ -296,7 +311,8 @@ function openTradeTagEditor({ dataPath, commitPrefix, entryId, trade, knownTagGr
 
 function openSessionBuilder(ctx) {
   const session = { id: uuid(), uploader: getLastName(), date: new Date().toISOString().slice(0, 10), trades: [] };
-  const knownGroups = (ctx.knownTagGroups && ctx.knownTagGroups.length ? ctx.knownTagGroups : PRESET_TAG_GROUPS).map((g) => ({ group: g.group, tags: [...g.tags] }));
+  const normalizedKnown = normalizeTagGroups(ctx.knownTagGroups);
+  const knownGroups = (normalizedKnown.length ? normalizedKnown : PRESET_TAG_GROUPS).map((g) => ({ group: g.group, tags: [...g.tags] }));
   let mode = 'idle'; // 'idle' | 'adding'
   let editingId = null;
   let pending = { file: null, result: null, tags: new Set(), previewUrl: null };
@@ -866,10 +882,12 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
 
   async function load() {
     try {
-      [state.entries, state.tagGroups] = await Promise.all([
+      let rawTagGroups;
+      [state.entries, rawTagGroups] = await Promise.all([
         getJson(dataPath, []),
         getJson('data/tags.json', PRESET_TAG_GROUPS)
       ]);
+      state.tagGroups = normalizeTagGroups(rawTagGroups);
       renderList();
       renderFilterBars();
     } catch (err) {
