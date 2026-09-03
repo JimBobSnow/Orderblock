@@ -1,1 +1,67 @@
-[]
+[
+  {
+    "id": "a52aead1-edfc-40ca-8175-9a180e41208b",
+    "uploader": "Mark",
+    "date": "2026-09-03",
+    "trades": [
+      {
+        "id": "daa234c3-3943-4de3-ba09-7920c5ed85b4",
+        "result": "win",
+        "tags": [
+          "Against trend",
+          "BOS"
+        ],
+        "image": "images/backtests/a52aead1-edfc-40ca-8175-9a180e41208b-daa234c3-3943-4de3-ba09-7920c5ed85b4.jpg",
+        "imageSha": "7e90144d1156148f858f03c4713aa777a8a85d39"
+      },
+      {
+        "id": "03a9c0be-9e98-455c-b6a0-6568769b6d25",
+        "result": "win",
+        "tags": [
+          "Support/Resistance",
+          "BOS",
+          "With trend",
+          "Swing"
+        ],
+        "image": "images/backtests/a52aead1-edfc-40ca-8175-9a180e41208b-03a9c0be-9e98-455c-b6a0-6568769b6d25.jpg",
+        "imageSha": "f086b7dc0596a3a89aaa7a025a2e5778a9c47883"
+      },
+      {
+        "id": "a81fccd0-c8db-4082-b87c-55d4cad9be54",
+        "result": "win",
+        "tags": [
+          "With trend",
+          "BOS",
+          "Support/Resistance"
+        ],
+        "image": "images/backtests/a52aead1-edfc-40ca-8175-9a180e41208b-a81fccd0-c8db-4082-b87c-55d4cad9be54.jpg",
+        "imageSha": "7b17124a15ec382b840e4bb29ec10cd834c642a0"
+      },
+      {
+        "id": "27349125-9007-4789-8ee6-bd0e1e7aade2",
+        "result": "win",
+        "tags": [
+          "BOS",
+          "With trend",
+          "Support/Resistance"
+        ],
+        "image": "images/backtests/a52aead1-edfc-40ca-8175-9a180e41208b-27349125-9007-4789-8ee6-bd0e1e7aade2.jpg",
+        "imageSha": "7b17124a15ec382b840e4bb29ec10cd834c642a0"
+      },
+      {
+        "id": "d28ac3e2-41f3-4871-9a06-f62d48d8165b",
+        "result": "win",
+        "tags": [
+          "Swing",
+          "Support/Resistance",
+          "BOS",
+          "With trend"
+        ],
+        "image": "images/backtests/a52aead1-edfc-40ca-8175-9a180e41208b-d28ac3e2-41f3-4871-9a06-f62d48d8165b.jpg",
+        "imageSha": "7b17124a15ec382b840e4bb29ec10cd834c642a0"
+      }
+    ],
+    "comments": [],
+    "createdAt": "2026-09-03T21:48:55.715Z"
+  }
+]
