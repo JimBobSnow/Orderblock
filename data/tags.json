@@ -20,16 +20,6 @@
     ]
   },
   {
-    "group": "Confirmation",
-    "tags": [
-      "LTF SNR",
-      "Support/Resistance Zone",
-      "LTF orderblock",
-      "LTF supply/demand",
-      "LTF overlap"
-    ]
-  },
-  {
     "group": "LTF",
     "tags": [
       "Single LTF",
