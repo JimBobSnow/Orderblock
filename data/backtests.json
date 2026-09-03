@@ -76,23 +76,5 @@
       }
     ],
     "createdAt": "2026-09-03T21:48:55.715Z"
-  },
-  {
-    "id": "786b646f-d2b0-4f89-a870-f3b08ccf9326",
-    "uploader": "Mark",
-    "date": "2026-09-03",
-    "trades": [
-      {
-        "id": "338fbafd-f93d-4308-bec4-9cdd7913f40d",
-        "result": "win",
-        "tags": [
-          "SnR Zone"
-        ],
-        "image": "images/backtests/786b646f-d2b0-4f89-a870-f3b08ccf9326-ae3b6813-1ede-4fdb-ae7e-60bb20657f7c.jpg",
-        "imageSha": "7e90144d1156148f858f03c4713aa777a8a85d39"
-      }
-    ],
-    "comments": [],
-    "createdAt": "2026-09-03T21:58:47.163Z"
   }
 ]
