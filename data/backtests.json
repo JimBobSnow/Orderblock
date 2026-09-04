@@ -79,5 +79,27 @@
       }
     ],
     "createdAt": "2026-09-03T21:48:55.715Z"
+  },
+  {
+    "id": "a3793fb9-0eaf-407b-ae62-37b96cc5779c",
+    "uploader": "Mark",
+    "date": "2026-09-04",
+    "trades": [
+      {
+        "id": "f36de922-a6aa-47c5-bd00-7d47f4e644bc",
+        "result": "win",
+        "tags": [
+          "With Trend",
+          "LTF SNR",
+          "BOS",
+          "Multi LTF zone",
+          "Orderblock LTF"
+        ],
+        "image": "images/backtests/a3793fb9-0eaf-407b-ae62-37b96cc5779c-b531b598-3cf1-4f5b-b92d-a87c8ad6d172.jpg",
+        "imageSha": "6fa76d67056a4cfef1c1e539123f997932766f41"
+      }
+    ],
+    "comments": [],
+    "createdAt": "2026-09-04T00:38:14.313Z"
   }
 ]
