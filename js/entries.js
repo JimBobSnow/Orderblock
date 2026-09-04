@@ -52,6 +52,15 @@ function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// "Today" for this app is always US Eastern time (where the market session
+// clock lives), regardless of the visitor's own timezone — not UTC, which is
+// what `new Date().toISOString()` would give and rolls over hours before
+// Eastern midnight (the bug this fixes: an evening EDT upload getting
+// stamped with tomorrow's UTC date). Intl handles the EDT/EST switch itself.
+function todayEastern() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+}
+
 function fmtDate(d) {
   if (!d) return '—';
   try {
@@ -310,7 +319,7 @@ function openTradeTagEditor({ dataPath, commitPrefix, entryId, trade, knownTagGr
 // --- Session builder (the "Upload session" modal flow) ---------------------
 
 function openSessionBuilder(ctx) {
-  const session = { id: uuid(), uploader: getLastName(), date: new Date().toISOString().slice(0, 10), trades: [] };
+  const session = { id: uuid(), uploader: getLastName(), date: todayEastern(), trades: [] };
   const normalizedKnown = normalizeTagGroups(ctx.knownTagGroups);
   const knownGroups = (normalizedKnown.length ? normalizedKnown : PRESET_TAG_GROUPS).map((g) => ({ group: g.group, tags: [...g.tags] }));
   let mode = 'idle'; // 'idle' | 'adding'
@@ -400,7 +409,7 @@ function openSessionBuilder(ctx) {
       body.innerHTML = `
         <div class="session-meta-row">
           <label>Uploader name<input type="text" id="s-uploader" value="${escapeHtml(session.uploader)}" /></label>
-          <label>Date<input type="date" id="s-date" value="${session.date}" /></label>
+          <label>Date<input type="date" id="s-date" value="${session.date}" max="${todayEastern()}" /></label>
         </div>
         <h3 class="trade-form-title">${isEditing ? 'Edit trade' : `Add trade ${session.trades.length + 1}`}</h3>
 
@@ -429,7 +438,11 @@ function openSessionBuilder(ctx) {
       `;
 
       body.querySelector('#s-uploader').addEventListener('input', (e) => { session.uploader = e.target.value; });
-      body.querySelector('#s-date').addEventListener('input', (e) => { session.date = e.target.value; });
+      body.querySelector('#s-date').addEventListener('input', (e) => {
+        const today = todayEastern();
+        if (e.target.value > today) { e.target.value = today; }
+        session.date = e.target.value;
+      });
 
       renderFilePreview();
       body.querySelector('#trade-file').addEventListener('change', (e) => {
@@ -468,7 +481,7 @@ function openSessionBuilder(ctx) {
       body.innerHTML = `
         <div class="session-meta-row">
           <label>Uploader name<input type="text" id="s-uploader" value="${escapeHtml(session.uploader)}" /></label>
-          <label>Date<input type="date" id="s-date" value="${session.date}" /></label>
+          <label>Date<input type="date" id="s-date" value="${session.date}" max="${todayEastern()}" /></label>
         </div>
 
         ${session.trades.length > 0 ? `
@@ -494,7 +507,11 @@ function openSessionBuilder(ctx) {
       `;
 
       body.querySelector('#s-uploader').addEventListener('input', (e) => { session.uploader = e.target.value; });
-      body.querySelector('#s-date').addEventListener('input', (e) => { session.date = e.target.value; });
+      body.querySelector('#s-date').addEventListener('input', (e) => {
+        const today = todayEastern();
+        if (e.target.value > today) { e.target.value = today; }
+        session.date = e.target.value;
+      });
       body.querySelector('#add-trade-btn').addEventListener('click', () => {
         resetPending();
         mode = 'adding';
@@ -579,7 +596,7 @@ function openSessionBuilder(ctx) {
       const entry = {
         id: session.id,
         uploader: session.uploader.trim() || 'Anonymous',
-        date: session.date || new Date().toISOString().slice(0, 10),
+        date: session.date || todayEastern(),
         trades: session.trades.map(({ id, result, tags, image, imageSha }) => ({ id, result, tags, image, imageSha })),
         comments: [],
         createdAt: new Date().toISOString()
@@ -850,7 +867,7 @@ export function initEntryPage({ dataPath, imageDir, entryNoun, commitPrefix }) {
           const target = data.find((x) => x.id === entry.id);
           if (target) {
             target.comments = target.comments || [];
-            target.comments.push({ id: uuid(), author, text, date: new Date().toISOString().slice(0, 10) });
+            target.comments.push({ id: uuid(), author, text, date: todayEastern() });
           }
           return data;
         }, `${commitPrefix}: note on ${entry.uploader || entry.id}`);
